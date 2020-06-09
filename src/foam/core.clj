@@ -136,16 +136,19 @@
                                                             (:text (:b1 block))
                                                             user-queries-to-run)) ;replace the text with user queries
                       (:text (:b1 block)))) ;default value of the original text
-  
-  
-  
   (println (str (:id (:b1 block)) (repeat level "*") final-string))
   (let [blocks (db/with-transaction local-db tx (seq (get-blocks-for-block-query tx {:bid (:id (:b1 block))})))]
     (doseq [child blocks]
       (print-block-and-children child (inc level)))))
 
-(defn show-page [page-id]
-  (def blocks (db/with-transaction local-db tx (seq (get-blocks-for-page-query tx {:pid page-id}))))
+(defn daily-notes []
+  (def date (.format (java.text.SimpleDateFormat. "MMM d, yyyy") (new java.util.Date)))
+  (show-page date))
+
+(defn show-page [page-title]
+  (def blocks (db/with-transaction local-db tx 
+                (create-page tx page-title)
+                (seq (get-blocks-for-page-query tx {:pid page-title}))))
   (println (:title (:p (first blocks))))
   (doseq [block blocks]
     (print-block-and-children block 1)))
