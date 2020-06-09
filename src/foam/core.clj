@@ -141,10 +141,6 @@
     (doseq [child blocks]
       (print-block-and-children child (inc level)))))
 
-(defn daily-notes []
-  (def date (.format (java.text.SimpleDateFormat. "MMM d, yyyy") (new java.util.Date)))
-  (show-page date))
-
 (defn show-page [page-title]
   (def blocks (db/with-transaction local-db tx 
                 (create-page tx page-title)
@@ -152,3 +148,7 @@
   (println (:title (:p (first blocks))))
   (doseq [block blocks]
     (print-block-and-children block 1)))
+
+(defn daily-notes []
+  (def date (.format (java.text.SimpleDateFormat. "MMM d, yyyy") (new java.util.Date)))
+  (show-page date))
