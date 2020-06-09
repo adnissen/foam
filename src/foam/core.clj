@@ -1,7 +1,6 @@
 (ns foam.core
   (:require [neo4j-clj.core :as db])
-  (:require [crypto.random])
-  (:import (java.net URI)))
+  (:require [crypto.random] [clojure.data.json :as json])  (:import (java.net URI)))
 
 (def db-url
   (new URI "bolt://localhost:7687"))
@@ -122,11 +121,28 @@
   [block-id] 
   (db/with-transaction local-db tx (move-block-down-one-position tx {:bid block-id})))
 
+(defn run-user-query [text user-query]
+  (db/with-transaction local-db tx
+    (db/defquery uq user-query)
+    (def uq-result (uq tx))
+    (clojure.string/replace text (str "{{code:cypher" user-query "}}") (json/write-str uq-result))))
+
 (defn print-block-and-children [block level]
-  (println (str (:id (:b1 block)) (repeat level "*") (:text (:b1 block))))
+  ;before printing, determine if we need to run a cypher query
+  (def user-queries-to-run (map second (re-seq #"\{\{code:cypher(.*?)\}\}" (:text (:b1 block)))))
+  (def final-string (if (not-empty user-queries-to-run) (do ;run each query, then replace the whole block with the result
+                                                          (reduce 
+                                                            run-user-query
+                                                            (:text (:b1 block))
+                                                            user-queries-to-run)) ;replace the text with user queries
+                      (:text (:b1 block)))) ;default value of the original text
+  
+  
+  
+  (println (str (:id (:b1 block)) (repeat level "*") final-string))
   (let [blocks (db/with-transaction local-db tx (seq (get-blocks-for-block-query tx {:bid (:id (:b1 block))})))]
-       (doseq [child blocks]
-         (print-block-and-children child (inc level)))))
+    (doseq [child blocks]
+      (print-block-and-children child (inc level)))))
 
 (defn show-page [page-id]
   (def blocks (db/with-transaction local-db tx (seq (get-blocks-for-page-query tx {:pid page-id}))))
