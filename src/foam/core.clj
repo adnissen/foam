@@ -1,9 +1,7 @@
 (ns foam.core
   (:require [neo4j-clj.core :as db])
-  (:require [crypto.random] [clojure.data.json :as json])  (:import (java.net URI)))
-
-(def db-url
-  (new URI "bolt://localhost:7687"))
+  (:require [crypto.random] [clojure.data.json :as json] [compojure.core :refer :all] [compojure.route :as route])  (:import (java.net URI)))(def db-url
+                                                                                                                                               (new URI "bolt://localhost:7687"))
 
 (def local-db
   (db/connect db-url "neo4j" "admin"))
@@ -148,7 +146,13 @@
   (println (:title (:p (first blocks))))
   (doseq [block blocks]
     (print-block-and-children block 1)))
-
+  
 (defn daily-notes []
   (def date (.format (java.text.SimpleDateFormat. "MMM d, yyyy") (new java.util.Date)))
   (show-page date))
+
+(defroutes app
+  (GET "/" [] "<h1>Hello World</h1>")
+  (route/not-found "<h1>Page not found</h1>"))
+
+(run-jetty app {:port 3000 :join? false})
