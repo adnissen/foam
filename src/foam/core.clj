@@ -135,9 +135,9 @@
                                                              (:text (:b1 block))
                                                              user-queries-to-run)) ;replace the text with user queries
                        (:text (:b1 block)))) ;default value of the original text
-   (def new-output (str old-output "<br /><p>" (:id (:b1 block)) (repeat level "*") final-string "</p>"))
+   (def new-output (str old-output "*" final-string "\n"))
    (def blocks (db/with-transaction local-db tx (seq (get-blocks-for-block-query tx {:bid (:id (:b1 block))}))))
-   (if (not-empty blocks) (reduce print-block-and-children new-output blocks)
+   (if (not-empty blocks) (reduce print-block-and-children (str new-output "*") blocks)
      new-output))   
   ([old-output block]
    (print-block-and-children old-output block 1)))
