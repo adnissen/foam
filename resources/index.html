@@ -26,12 +26,6 @@ function alertContents() {
       }
     }
   }
-var httpRequest;
-httpRequest = new XMLHttpRequest();
-httpRequest.onreadystatechange = alertContents;
-httpRequest.open('GET', '/daily-notes');
-httpRequest.send();
-
 
 Vue.component('block', {
   props: ['block', 'level'],
@@ -47,7 +41,15 @@ Vue.component('block', {
 
 var app = new Vue({
   el: '#app',
-  data: {page: pageData}
+  data: {page: pageData, currentRoute: window.location.pathname}
 })
+
+var httpRequest;
+httpRequest = new XMLHttpRequest();
+httpRequest.onreadystatechange = alertContents;
+var apiRoute = "/api/daily-notes";
+if (app.currentRoute != "/") { apiRoute = app.currentRoute.replace("app", "api") } 
+httpRequest.open('GET', apiRoute);
+httpRequest.send();
 
 </script>

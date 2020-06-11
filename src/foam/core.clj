@@ -155,7 +155,9 @@
 
 (defroutes app
   (GET "/" [] (slurp "./resources/index.html"))
-  (GET "/daily-notes" [] (daily-notes))
+  (GET "/api/daily-notes" [] (daily-notes))
+  (GET "/app/:page-id" [page-id] (slurp "./resources/index.html"))
+  (GET "/api/:page-id" [page-id] (show-page page-id))
   (route/not-found "<h1>Page not found</h1>"))
 
 (use 'ring.adapter.jetty)
