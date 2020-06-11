@@ -5,7 +5,12 @@
 <div id="app">
   {{ page.pageTitle }}
   <br>
-  {{ page.children }}
+  <block
+    v-for="block in page.children"
+    v-bind:block="block"
+    v-bind:level="0"
+    v-bind:key="block.id">
+  </block>
 </div>
 
 <script>
@@ -27,8 +32,22 @@ httpRequest.onreadystatechange = alertContents;
 httpRequest.open('GET', '/daily-notes');
 httpRequest.send();
 
+
+Vue.component('block', {
+  props: ['block', 'level'],
+  data: function () {
+    return {
+      styleObject: {
+        marginLeft: (this.level * 10) + "px"
+      }
+    }
+  },
+  template: '<span v-bind:style="this.styleObject">* {{ block.text }}<br /><block v-for="child in block.children" v-bind:block="child" v-bind:level="level + 1" v-bind:key="child.id"> </block></span>'
+})
+
 var app = new Vue({
   el: '#app',
   data: {page: pageData}
 })
+
 </script>
