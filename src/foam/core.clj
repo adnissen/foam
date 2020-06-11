@@ -125,34 +125,41 @@
     (def uq-result (uq tx))
     (clojure.string/replace text (str "{{code:cypher" user-query "}}") (json/write-str uq-result))))
 
-(defn print-block-and-children [block level]
-  ;before printing, determine if we need to run a cypher query
-  (def user-queries-to-run (map second (re-seq #"\{\{code:cypher(.*?)\}\}" (:text (:b1 block)))))
-  (def final-string (if (not-empty user-queries-to-run) (do ;run each query, then replace the whole block with the result
-                                                          (reduce 
-                                                            run-user-query
-                                                            (:text (:b1 block))
-                                                            user-queries-to-run)) ;replace the text with user queries
-                      (:text (:b1 block)))) ;default value of the original text
-  (println (str (:id (:b1 block)) (repeat level "*") final-string))
-  (let [blocks (db/with-transaction local-db tx (seq (get-blocks-for-block-query tx {:bid (:id (:b1 block))})))]
-    (doseq [child blocks]
-      (print-block-and-children child (inc level)))))
+(defn print-block-and-children 
+  ([old-output block level]
+   ;before printing, determine if we need to run a cypher query
+   (def user-queries-to-run (map second (re-seq #"\{\{code:cypher(.*?)\}\}" (:text (:b1 block)))))
+   (def final-string (if (not-empty user-queries-to-run) (do ;run each query, then replace the whole block with the result
+                                                           (reduce 
+                                                             run-user-query
+                                                             (:text (:b1 block))
+                                                             user-queries-to-run)) ;replace the text with user queries
+                       (:text (:b1 block)))) ;default value of the original text
+   (def new-output (str old-output "<di><p>" (:id (:b1 block)) (repeat level "*") final-string "</p>"))
+   (let [blocks (db/with-transaction local-db tx (seq (get-blocks-for-block-query tx {:bid (:id (:b1 block))})))]
+     (if (not-empty blocks) (do
+                              (doseq [child blocks]
+                                (print-block-and-children new-output child (inc level))))
+                            new-output)))
+                              
+     
+  ([old-output block]
+   (print-block-and-children old-output block 1)))
+
 
 (defn show-page [page-title]
   (def blocks (db/with-transaction local-db tx 
                 (create-page tx page-title)
                 (seq (get-blocks-for-page-query tx {:pid page-title}))))
-  (println (:title (:p (first blocks))))
-  (doseq [block blocks]
-    (print-block-and-children block 1)))
+  (reduce print-block-and-children (str "<h1>" (:title (:p (first blocks))) "</h1>\n") blocks))
   
 (defn daily-notes []
   (def date (.format (java.text.SimpleDateFormat. "MMM d, yyyy") (new java.util.Date)))
   (show-page date))
 
 (defroutes app
-  (GET "/" [] "<h1>Hello World</h1>")
+  (GET "/" [] (daily-notes))
   (route/not-found "<h1>Page not found</h1>"))
 
+(use 'ring.adapter.jetty)
 (run-jetty app {:port 3000 :join? false})
