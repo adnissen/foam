@@ -135,10 +135,10 @@
                                                              (:text (:b1 block))
                                                              user-queries-to-run)) ;replace the text with user queries
                        (:text (:b1 block)))) ;default value of the original text
-   (def new-output (str old-output "*" final-string "\n"))
+   (def new-output (conj {:text final-string :id (:id (:b1 block)) :children []}))
    (def blocks (db/with-transaction local-db tx (seq (get-blocks-for-block-query tx {:bid (:id (:b1 block))}))))
-   (if (not-empty blocks) (reduce print-block-and-children (str new-output "*") blocks)
-     new-output))   
+   (if (not-empty blocks) (conj old-output (assoc new-output :children (reduce print-block-and-children [] blocks)))
+     (conj old-output new-output)))   
   ([old-output block]
    (print-block-and-children old-output block 1)))
 
@@ -147,14 +147,15 @@
   (def blocks (db/with-transaction local-db tx 
                 (create-page tx page-title)
                 (seq (get-blocks-for-page-query tx {:pid page-title}))))
-  (reduce print-block-and-children (str "<h1>" (:title (:p (first blocks))) "</h1>\n") blocks))
+  (json/write-str {:pageTitle (:title (:p (first blocks))) :children (reduce print-block-and-children [] blocks)}))
   
 (defn daily-notes []
   (def date (.format (java.text.SimpleDateFormat. "MMM d, yyyy") (new java.util.Date)))
   (show-page date))
 
 (defroutes app
-  (GET "/" [] (daily-notes))
+  (GET "/" [] (slurp "./resources/index.html"))
+  (GET "/daily-notes" [] (daily-notes))
   (route/not-found "<h1>Page not found</h1>"))
 
 (use 'ring.adapter.jetty)

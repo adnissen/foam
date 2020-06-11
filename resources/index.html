@@ -1,0 +1,34 @@
+<head>
+<script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+</head>
+
+<div id="app">
+  {{ page.pageTitle }}
+  <br>
+  {{ page.children }}
+</div>
+
+<script>
+var pageTitle = "";
+var pageData = {pageTitle: pageTitle, children: []};
+
+function alertContents() {
+    if (httpRequest.readyState === XMLHttpRequest.DONE) {
+      if (httpRequest.status === 200) {
+        app.page = JSON.parse(httpRequest.responseText);
+      } else {
+        alert('There was a problem with the request.');
+      }
+    }
+  }
+var httpRequest;
+httpRequest = new XMLHttpRequest();
+httpRequest.onreadystatechange = alertContents;
+httpRequest.open('GET', '/daily-notes');
+httpRequest.send();
+
+var app = new Vue({
+  el: '#app',
+  data: {page: pageData}
+})
+</script>
