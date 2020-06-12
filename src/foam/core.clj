@@ -131,7 +131,7 @@
 (defn replace-page-names-with-links [text page]
   (db/with-transaction local-db tx 
     (def page-id (:id (first (find-page-id-by-title-query tx {:title page}))))
-    (clojure.string/replace text page (str "<a href='/app/" page-id "'>" page "</a>"))))
+    (clojure.string/replace text page (str "<a href='/app/show/" page-id "'>" page "</a>"))))
   
 (defn print-block-and-children 
   ([old-output block level]
@@ -163,14 +163,19 @@
   (db/with-transaction local-db tx (def page-contents (find-page-id-by-title-query tx {:title date}))
                                    (if (= page-contents ()) (create-page date))
                                    (show-page (:id (first (find-page-id-by-title-query tx {:title date}))))))
-                        
+          
+(require '[ring.middleware.defaults :refer :all])
 
 (defroutes app
   (GET "/" [] (slurp "./resources/index.html"))
   (GET "/api/daily-notes" [] (daily-notes))
-  (GET "/app/:page-id" [page-id] (slurp "./resources/index.html"))
-  (GET "/api/:page-id" [page-id] (show-page page-id))
+  (GET "/api/update/:blockid" [blockid newtext] (edit-block blockid newtext))
+  (GET "/app/show/:page-id" [page-id] (slurp "./resources/index.html"))
+  (GET "/api/show/:page-id" [page-id] (show-page page-id))
   (route/not-found "<h1>Page not found</h1>"))
 
+(def site
+  (wrap-defaults app site-defaults))
+
 (use 'ring.adapter.jetty)
-(run-jetty app {:port 3000 :join? false})
+(run-jetty site {:port 3000 :join? false})
