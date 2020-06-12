@@ -3,7 +3,7 @@
 </head>
 
 <div id="app">
-  {{ page.pageTitle }}
+  {{ page.pageTitle }} ({{ page.id }})
   <br>
   <block
     v-for="block in page.children"
@@ -36,7 +36,7 @@ Vue.component('block', {
       }
     }
   },
-  template: '<span v-bind:style="this.styleObject">* {{ block.text }}<br /><block v-for="child in block.children" v-bind:block="child" v-bind:level="level + 1" v-bind:key="child.id"> </block></span>'
+  template: '<span v-bind:style="this.styleObject">* <span v-html="block.text"></span><br /><block v-for="child in block.children" v-bind:block="child" v-bind:level="level + 1" v-bind:key="child.id"> </block></span>'
 })
 
 var app = new Vue({
@@ -48,7 +48,7 @@ var httpRequest;
 httpRequest = new XMLHttpRequest();
 httpRequest.onreadystatechange = alertContents;
 var apiRoute = "/api/daily-notes";
-if (app.currentRoute != "/") { apiRoute = app.currentRoute.replace("app", "api") } 
+if (app.currentRoute != "/") { apiRoute = app.currentRoute.replace("app", "api") }
 httpRequest.open('GET', apiRoute);
 httpRequest.send();
 

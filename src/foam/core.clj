@@ -37,7 +37,7 @@
   "MATCH (b:block {id: $bid}) MATCH (b)-[r:LINKS_TO]->(p:page) where not p.title in $remaininglinks delete r")
   
 (db/defquery get-blocks-for-page-query
-  "MATCH (p:page)-[r:CONTAINS]->(b1:block) where p.id = $pid or p.title = $pid return p, b1 order by r.position")
+  "MATCH (p:page {id: $pid})-[r:CONTAINS]->(b1:block) return p, b1 order by r.position")
 
 (db/defquery get-blocks-for-block-query
   "MATCH (b:block {id: $bid})-[r:CONTAINS]->(b1:block) return b, b1 order by r.position")
@@ -50,6 +50,9 @@
 
 (db/defquery find-page-by-title-query
   "MATCH (p:page {title: $title}) return p")
+
+(db/defquery find-page-id-by-title-query
+  "MATCH (p:page {title: $title}) return p.id as id")
 
 (db/defquery edit-block-query
   "MATCH (b:block {id: $bid}) SET b.text = $text")
@@ -101,8 +104,8 @@
    (def position
      (get-last-page-position tx page-id))
    (create-block-query tx {:id block-id :text text})
-   (update-relations-for-block tx block-id text)
-   (create-page-contains-relation-for-block tx {:pid page-id :bid block-id :position (inc position)}))
+   (create-page-contains-relation-for-block tx {:pid page-id :bid block-id :position (inc position)})
+   (update-relations-for-block tx block-id text))
   ([page-id text] (db/with-transaction local-db tx (add-new-block-to-page tx page-id text))))
                                      
 (defn edit-block 
@@ -125,17 +128,24 @@
     (def uq-result (uq tx))
     (clojure.string/replace text (str "{{code:cypher" user-query "}}") (json/write-str uq-result))))
 
+(defn replace-page-names-with-links [text page]
+  (db/with-transaction local-db tx 
+    (def page-id (:id (first (find-page-id-by-title-query tx {:title page}))))
+    (clojure.string/replace text page (str "<a href='/app/" page-id "'>" page "</a>"))))
+  
 (defn print-block-and-children 
   ([old-output block level]
    ;before printing, determine if we need to run a cypher query
    (def user-queries-to-run (map second (re-seq #"\{\{code:cypher(.*?)\}\}" (:text (:b1 block)))))
-   (def final-string (if (not-empty user-queries-to-run) (do ;run each query, then replace the whole block with the result
-                                                           (reduce 
-                                                             run-user-query
-                                                             (:text (:b1 block))
-                                                             user-queries-to-run)) ;replace the text with user queries
-                       (:text (:b1 block)))) ;default value of the original text
-   (def new-output (conj {:text final-string :id (:id (:b1 block)) :children []}))
+   (def string-after-user-queries (if (not-empty user-queries-to-run) (do ;run each query, then replace the whole block with the result
+                                                                        (reduce 
+                                                                          run-user-query
+                                                                          (:text (:b1 block))
+                                                                          user-queries-to-run)) ;replace the text with user queries
+                                    (:text (:b1 block)))) ;default value of the original text
+   (def page-ids-to-lookup (map second (re-seq #"\[\[(.*?)\]\]" string-after-user-queries)))
+   (def string-after-page-names-replaced-with-links (reduce replace-page-names-with-links string-after-user-queries page-ids-to-lookup))  
+   (def new-output (conj {:text string-after-page-names-replaced-with-links :id (:id (:b1 block)) :children []}))
    (def blocks (db/with-transaction local-db tx (seq (get-blocks-for-block-query tx {:bid (:id (:b1 block))}))))
    (if (not-empty blocks) (conj old-output (assoc new-output :children (reduce print-block-and-children [] blocks)))
      (conj old-output new-output)))   
@@ -143,15 +153,17 @@
    (print-block-and-children old-output block 1)))
 
 
-(defn show-page [page-title]
+(defn show-page [page-id]
   (def blocks (db/with-transaction local-db tx 
-                (create-page tx page-title)
-                (seq (get-blocks-for-page-query tx {:pid page-title}))))
-  (json/write-str {:pageTitle (:title (:p (first blocks))) :children (reduce print-block-and-children [] blocks)}))
+                (seq (get-blocks-for-page-query tx {:pid page-id}))))
+  (json/write-str {:pageTitle (:title (:p (first blocks))) :id (:id (:p (first blocks))) :children (reduce print-block-and-children [] blocks)}))
   
 (defn daily-notes []
   (def date (.format (java.text.SimpleDateFormat. "MMM d, yyyy") (new java.util.Date)))
-  (show-page date))
+  (db/with-transaction local-db tx (def page-contents (find-page-id-by-title-query tx {:title date}))
+                                   (if (= page-contents ()) (create-page date))
+                                   (show-page (:id (first (find-page-id-by-title-query tx {:title date}))))))
+                        
 
 (defroutes app
   (GET "/" [] (slurp "./resources/index.html"))
