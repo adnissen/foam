@@ -28,7 +28,7 @@
   "MATCH (b1:block {id: $bid1}) MATCH (b2:block {id: $bid2}) create (b1)-[:CONTAINS{position: $position}]->(b2)")
 
 (db/defquery create-block-links-to-page-relation
-  "MATCH (p:page {title: $ptitle}) MATCH (b:block {id: $bid}) create (b)-[:LINKS_TO]->(p)")
+  "MATCH (p:page {title: $ptitle}) MATCH (b:block {id: $bid}) merge (b)-[:LINKS_TO]->(p)")
 
 (db/defquery get-block-links-to-page-relations
   "MATCH (b:block {id: $bid}) MATCH (b)-[r:LINKS_TO]->(p:page) return p.title as title")
@@ -89,9 +89,9 @@
 (defn add-new-block-to-block 
   ([tx original-block-id text]
    (def new-block-id
-     (str (crypto.random/hex 10)))
+     (str (crypto.random/hex 10))) 
    (def position
-     (get-last-block-position tx original-block-id))      
+     (get-last-block-position tx original-block-id))
    (create-block-query tx {:id new-block-id :text text})
    (create-block-contains-relation-for-block tx {:bid1 original-block-id :bid2 new-block-id :position (inc position)})
    (update-relations-for-block tx new-block-id text))
@@ -131,7 +131,7 @@
 (defn replace-page-names-with-links [text page]
   (db/with-transaction local-db tx 
     (def page-id (:id (first (find-page-id-by-title-query tx {:title page}))))
-    (clojure.string/replace text page (str "<a href='/app/show/" page-id "'>" page "</a>"))))
+    (clojure.string/replace text page (str "<a contenteditable='false' href='/app/show/" page-id "'>" page "</a>"))))
   
 (defn print-block-and-children 
   ([old-output block level]
@@ -170,6 +170,8 @@
   (GET "/" [] (slurp "./resources/index.html"))
   (GET "/api/daily-notes" [] (daily-notes))
   (GET "/api/update/:blockid" [blockid newtext] (edit-block blockid newtext))
+  (GET "/api/new/block/page/:page-id" [page-id] (add-new-block-to-page page-id ""))
+  (GET "/api/new/block/:block-id" [block-id] (add-new-block-to-block block-id ""))
   (GET "/app/show/:page-id" [page-id] (slurp "./resources/index.html"))
   (GET "/api/show/:page-id" [page-id] (show-page page-id))
   (route/not-found "<h1>Page not found</h1>"))

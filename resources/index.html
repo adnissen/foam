@@ -38,7 +38,23 @@ Vue.component('block', {
     }
   },
   methods: {
+    gainFocus: function(event) {
+      this.startingText = event.target.textContent;
+      var blockId = this.block.id;
+      var level = this.level;
+      event.target.onkeydown = function(e) {
+        if ( e.keyCode == 13 ){        
+          e.preventDefault();
+          if (level == 0) {
+            createBlockInPage(app.page.id);
+          } else { createBlockInBlock(blockId); }
+        }
+      }
+    },
     loseFocus: function(event) {
+      event.target.onkeydown = function(e) {};
+      //only send the update request if the text has changed
+      if (this.startingText == event.target.textContent) { return; }
       var updateBlockRequest;
       updateBlockRequest = new XMLHttpRequest();
       updateBlockRequest.onreadystatechange = function() {
@@ -53,7 +69,7 @@ Vue.component('block', {
       updateBlockRequest.send();
     }
   },
-  template: '<span v-bind:style="this.styleObject">* <span contenteditable="true" v-on:focusout="loseFocus" v-html="block.text"></span><br /><block v-for="child in block.children" v-bind:block="child" v-bind:level="level + 1" v-bind:key="child.id"> </block></span>'})
+  template: '<span v-bind:style="this.styleObject">* <span contenteditable="true" v-on:focusin="gainFocus" v-on:focusout="loseFocus" v-html="block.text"></span><br /><block v-for="child in block.children" v-bind:block="child" v-bind:level="level + 1" v-bind:key="child.id"> </block></span>'})
 
 var app = new Vue({
   el: '#app',
@@ -67,6 +83,36 @@ var apiRoute = "/api/daily-notes";
 if (app.currentRoute != "/") { apiRoute = app.currentRoute.replace("app", "api") }
 httpRequest.open('GET', apiRoute);
 httpRequest.send();
+}
+
+function createBlockInBlock(blockId) {
+      var newBlockRequest;
+      newBlockRequest = new XMLHttpRequest();
+      newBlockRequest.onreadystatechange = function() {
+        if (newBlockRequest.readyState === XMLHttpRequest.DONE) {
+              if (newBlockRequest.status === 200) {
+                loadPage();
+              }
+            }
+        };
+      var apiRoute = "/api/new/block/" + blockId;
+      newBlockRequest.open('GET', apiRoute, true);
+      newBlockRequest.send();
+}
+
+function createBlockInPage(pageId) {
+      var newBlockRequest;
+      newBlockRequest = new XMLHttpRequest();
+      newBlockRequest.onreadystatechange = function() {
+        if (newBlockRequest.readyState === XMLHttpRequest.DONE) {
+              if (newBlockRequest.status === 200) {
+                loadPage();
+              }
+            }
+        };
+      var apiRoute = "/api/new/block/page/" + pageId;
+      newBlockRequest.open('GET', apiRoute, true);
+      newBlockRequest.send();
 }
 
 loadPage();
