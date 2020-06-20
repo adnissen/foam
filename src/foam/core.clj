@@ -2,6 +2,7 @@
   (:require [neo4j-clj.core :as db])
   (:require [crypto.random] [clojure.data.json :as json] [compojure.core :refer :all] [compojure.route :as route])  (:import (java.net URI)))(def db-url
                                                                                                                                                (new URI "bolt://localhost:7687"))
+(use 'ring.adapter.jetty)
 
 (def local-db
   (db/connect db-url "neo4j" "admin"))
@@ -10,13 +11,13 @@
   (println "Starting Server"))
 
 (db/defquery create-page-query 
-  "CREATE (p:page {title: $title, id: $id})")
+  "MERGE (p:page {title: $title, id: $id})")
 
 (db/defquery create-block-query
-  "CREATE (b:block {id: $id, text: $text})")
+  "MERGE (b:block {id: $id, text: $text})")
 
 (db/defquery create-page-contains-relation-for-block
-  "MATCH (p:page {id: $pid}) MATCH (b:block {id: $bid}) create (p)-[:CONTAINS{position: $position}]->(b)")
+  "MATCH (p:page {id: $pid}) MATCH (b:block {id: $bid}) MERGE (p)-[:CONTAINS{position: $position}]->(b)")
 
 (db/defquery get-last-page-position-query
   "MATCH (p:page {id: $pid}) MATCH (p)-[r:CONTAINS]->() RETURN COALESCE(max(r.position), -1) as position")
@@ -25,7 +26,7 @@
   "MATCH (b:block {id: $bid}) MATCH (b)-[r:CONTAINS]->() RETURN COALESCE(max(r.position), -1) as position")
 
 (db/defquery create-block-contains-relation-for-block 
-  "MATCH (b1:block {id: $bid1}) MATCH (b2:block {id: $bid2}) create (b1)-[:CONTAINS{position: $position}]->(b2)")
+  "MATCH (b1:block {id: $bid1}) MATCH (b2:block {id: $bid2}) MERGE (b1)-[:CONTAINS{position: $position}]->(b2)")
 
 (db/defquery create-block-links-to-page-relation
   "MATCH (p:page {title: $ptitle}) MATCH (b:block {id: $bid}) merge (b)-[:LINKS_TO]->(p)")
@@ -176,8 +177,5 @@
   (GET "/api/show/:page-id" [page-id] (show-page page-id))
   (route/not-found "<h1>Page not found</h1>"))
 
-(def site
+(def app
   (wrap-defaults app site-defaults))
-
-(use 'ring.adapter.jetty)
-(run-jetty site {:port 3000 :join? false})
