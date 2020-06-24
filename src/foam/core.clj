@@ -62,7 +62,7 @@
   "MATCH ()-[r:CONTAINS]->(b:block {id: $bid}) delete r")
 
 (db/defquery move-other-blocks-up-before-delete-query
-  "MATCH (p:page)-[r:contains]->(b:block {id: $bid}) MATCH (p)-[r2:contains]->(b2) where r2.position > r.position set r2.position = r2.position - 1")
+  "MATCH (parent)-[r:CONTAINS]->(b:block {id: $bid}) MATCH (parent)-[r2:CONTAINS]->() where r2.position > r.position set r2.position = r2.position - 1")
 
 (db/defquery delete-references-to-block-query
   "MATCH ()-[r]->(b:block {id: $bid}) delete r")
@@ -78,6 +78,9 @@
 
 (db/defquery get-block-id-to-unindent-into
   "match (parent)-[r:CONTAINS]->(b:block {id: $bid}) optional match (grandparent)-[r2:CONTAINS]->(parent) return COALESCE(grandparent.id, null) as new_parent_id")
+
+(db/defquery get-number-of-fellow-root-blocks-in-page ;this will return 0 if the block passed in is not a root block
+  "match (p:page)-[r:CONTAINS]->(b:block {id: $bid}) match (p)-[r2:CONTAINS]->() return COUNT(r2) as root_blocks_in_page")
 
 ;this should be executed inside another transaction
 (defn get-last-page-position [tx page-id] (:position (first (get-last-page-position-query tx {:pid page-id}))))
@@ -144,11 +147,15 @@
   (db/with-transaction local-db tx (move-block-down-one-position tx {:bid block-id})))
 
 (defn delete-block [block-id]
-  (db/with-transaction local-db tx 
-    (move-other-blocks-up-before-delete-query tx {:bid block-id})
-    (delete-references-to-block-query tx {:bid block-id})
-    (delete-references-from-block-query tx {:bid block-id})
-    (delete-block-query tx {:bid block-id})
+  (db/with-transaction local-db tx
+    (def root-blocks (:root_blocks_in_page (first (get-number-of-fellow-root-blocks-in-page tx {:bid block-id}))))
+    (def last-block? (== root-blocks 1))
+    (if (not last-block?) (do
+      (move-other-blocks-up-before-delete-query tx {:bid block-id})
+      (delete-references-to-block-query tx {:bid block-id})
+      (delete-references-from-block-query tx {:bid block-id})
+      (delete-block-query tx {:bid block-id})
+    )) 
   ))
 
 (defn indent-block [block-id]

@@ -68,6 +68,10 @@ Vue.component('block', {
         } else if ( e.keyCode == 9 ){    //tab    
           e.preventDefault();
           indentBlock(blockId);
+        } else if (e.keyCode == 8) { //backspace
+          if (e.target.textContent == "") {
+            deleteBlock(blockId);
+          }
         }
       }
     },
