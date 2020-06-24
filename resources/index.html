@@ -62,8 +62,10 @@ Vue.component('block', {
           if (level == 0) {
             createBlockInPage(app.page.id);
           } else { createBlockInBlock(blockId, ""); }
-        }
-        if ( e.keyCode == 9 ){    //tab    
+        } else if ( e.shiftKey && e.keyCode == 9 ){    //shift-tab    
+          e.preventDefault();
+          unindentBlock(blockId);
+        } else if ( e.keyCode == 9 ){    //tab    
           e.preventDefault();
           indentBlock(blockId);
         }
@@ -131,6 +133,21 @@ function indentBlock(blockId) {
   var apiRoute = "/api/indent/block/" + blockId;
   indentBlockRequest.open('GET', apiRoute, true);
   indentBlockRequest.send();
+}
+
+function unindentBlock(blockId) {
+  var unindentBlockRequest;
+  unindentBlockRequest = new XMLHttpRequest();
+  unindentBlockRequest.onreadystatechange = function() {
+    if (unindentBlockRequest.readyState === XMLHttpRequest.DONE) {
+          if (unindentBlockRequest.status === 200) {
+            loadPage();
+          }
+        }
+    };
+  var apiRoute = "/api/unindent/block/" + blockId;
+  unindentBlockRequest.open('GET', apiRoute, true);
+  unindentBlockRequest.send();
 }
 
 function createBlockInBlock(blockId, text) {

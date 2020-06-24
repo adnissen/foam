@@ -17,16 +17,16 @@
   "MERGE (b:block {id: $id, text: $text})")
 
 (db/defquery create-page-contains-relation-for-block
-  "MATCH (p:page {id: $pid}) MATCH (b:block {id: $bid}) MERGE (p)-[:CONTAINS{position: $position}]->(b)")
+  "MATCH (p {id: $pid}) MATCH (b:block {id: $bid}) MERGE (p)-[:CONTAINS{position: $position}]->(b)")
 
 (db/defquery get-last-page-position-query
-  "MATCH (p:page {id: $pid}) MATCH (p)-[r:CONTAINS]->() RETURN COALESCE(max(r.position), -1) as position")
+  "MATCH (p {id: $pid}) MATCH (p)-[r:CONTAINS]->() RETURN COALESCE(max(r.position), -1) as position")
 
 (db/defquery get-last-block-position-query
-  "MATCH (b:block {id: $bid}) MATCH (b)-[r:CONTAINS]->() RETURN COALESCE(max(r.position), -1) as position")
+  "MATCH (b {id: $bid}) MATCH (b)-[r:CONTAINS]->() RETURN COALESCE(max(r.position), -1) as position")
 
 (db/defquery create-block-contains-relation-for-block 
-  "MATCH (b1:block {id: $bid1}) MATCH (b2:block {id: $bid2}) MERGE (b1)-[:CONTAINS{position: $position}]->(b2)")
+  "MATCH (b1 {id: $bid1}) MATCH (b2:block {id: $bid2}) MERGE (b1)-[:CONTAINS{position: $position}]->(b2)")
 
 (db/defquery create-block-links-to-page-relation
   "MATCH (p:page {title: $ptitle}) MATCH (b:block {id: $bid}) merge (b)-[:LINKS_TO]->(p)")
@@ -75,6 +75,9 @@
 
 (db/defquery get-block-id-to-indent-into
   "match (parent)-[r:CONTAINS]->(b:block {id: $bid}) optional match (parent)-[r2:CONTAINS]->(b2) where r2.position = r.position - 1 optional match (grandparent) -[r3:CONTAINS]->(parent) optional match (grandparent)-[r4:CONTAINS]->(b3) where r4.position = r3.position - 1 return COALESCE(b2.id, r3.id, null) as new_parent_id")
+
+(db/defquery get-block-id-to-unindent-into
+  "match (parent)-[r:CONTAINS]->(b:block {id: $bid}) optional match (grandparent)-[r2:CONTAINS]->(parent) return COALESCE(grandparent.id, null) as new_parent_id")
 
 ;this should be executed inside another transaction
 (defn get-last-page-position [tx page-id] (:position (first (get-last-page-position-query tx {:pid page-id}))))
@@ -159,6 +162,17 @@
   )
 )
 
+(defn unindent-block [block-id]
+  (db/with-transaction local-db tx 
+    (def new-parent-id (:new_parent_id (first (get-block-id-to-unindent-into tx {:bid block-id}))))
+    (if (some? new-parent-id) (do
+      (delete-contains-relations-to-block-query tx {:bid block-id})
+      (def new-position (get-last-block-position tx new-parent-id))
+      (create-block-contains-relation-for-block tx {:bid1 new-parent-id :bid2 block-id :position (inc new-position)})
+    ))
+  )
+)
+
 (defn run-user-query [text user-query]
   (db/with-transaction local-db tx
     (db/defquery uq user-query)
@@ -212,6 +226,7 @@
   (GET "/api/new/block/:block-id/:text" [block-id text] (add-new-block-to-block block-id text))
   (GET "/api/delete/block/:block-id" [block-id] (delete-block block-id))
   (GET "/api/indent/block/:block-id" [block-id] (indent-block block-id))
+  (GET "/api/unindent/block/:block-id" [block-id] (unindent-block block-id))
   (GET "/app/show/:page-id" [page-id] (slurp "./resources/index.html"))
   (GET "/api/show/:page-id" [page-id] (show-page page-id))
   (route/not-found "<h1>Page not found</h1>"))
