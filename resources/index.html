@@ -6,9 +6,10 @@
   {{ page.pageTitle }} ({{ page.id }})
   <br>
   <block
-    v-for="block in page.children"
+    v-for="(block, index) in page.children"
     v-bind:block="block"
     v-bind:level="0"
+    v-bind:position="index"
     v-bind:key="block.id">
   </block>
 </div>
@@ -28,8 +29,20 @@ function alertContents() {
     }
   }
 
+//todo: optimize this to actually break early once we've found our element
+function findBlockByLevelAndPosition(blocks, level, position) {
+  var ret;
+  blocks.forEach(block => {
+    if (!!ret) { return; }
+    found = findBlockByLevelAndPosition(block.$children, level, position)
+    if (!!found) { ret = found; }
+    if (level == block._props["level"] && position == block._props["position"]) { ret = block; }
+  })
+  return ret;
+}
+
 Vue.component('block', {
-  props: ['block', 'level'],
+  props: ['block', 'level', 'position'],
   data: function () {
     return {
       styleObject: {
@@ -42,12 +55,17 @@ Vue.component('block', {
       this.startingText = event.target.textContent;
       var blockId = this.block.id;
       var level = this.level;
+      var position = this.position;
       event.target.onkeydown = function(e) {
-        if ( e.keyCode == 13 ){        
+        if ( e.keyCode == 13 ){    //enter    
           e.preventDefault();
           if (level == 0) {
             createBlockInPage(app.page.id);
-          } else { createBlockInBlock(blockId); }
+          } else { createBlockInBlock(blockId, ""); }
+        }
+        if ( e.keyCode == 9 ){    //tab    
+          e.preventDefault();
+          indentBlock(blockId);
         }
       }
     },
@@ -69,8 +87,8 @@ Vue.component('block', {
       updateBlockRequest.send();
     }
   },
-  template: '<span v-bind:style="this.styleObject">* <span contenteditable="true" v-on:focusin="gainFocus" v-on:focusout="loseFocus" v-html="block.text"></span><br /><block v-for="child in block.children" v-bind:block="child" v-bind:level="level + 1" v-bind:key="child.id"> </block></span>'})
-
+  template: '<span v-bind:style="this.styleObject">* <span contenteditable="true" v-on:focusin="gainFocus" v-on:focusout="loseFocus" v-html="block.text"></span><br /><block v-for="(child, index) in block.children" v-bind:block="child" v-bind:level="level + 1" v-bind:position="index" v-bind:key="child.id"> </block></span>'})
+//add a position to the above template and component itself
 var app = new Vue({
   el: '#app',
   data: {page: pageData, currentRoute: window.location.pathname}
@@ -85,34 +103,64 @@ httpRequest.open('GET', apiRoute);
 httpRequest.send();
 }
 
-function createBlockInBlock(blockId) {
-      var newBlockRequest;
-      newBlockRequest = new XMLHttpRequest();
-      newBlockRequest.onreadystatechange = function() {
-        if (newBlockRequest.readyState === XMLHttpRequest.DONE) {
-              if (newBlockRequest.status === 200) {
-                loadPage();
-              }
-            }
-        };
-      var apiRoute = "/api/new/block/" + blockId;
-      newBlockRequest.open('GET', apiRoute, true);
-      newBlockRequest.send();
+function deleteBlock(blockId) {
+  var deleteBlockRequest;
+  deleteBlockRequest = new XMLHttpRequest();
+  deleteBlockRequest.onreadystatechange = function() {
+    if (deleteBlockRequest.readyState === XMLHttpRequest.DONE) {
+          if (deleteBlockRequest.status === 200) {
+            loadPage();
+          }
+        }
+    };
+  var apiRoute = "/api/delete/block/" + blockId;
+  deleteBlockRequest.open('GET', apiRoute, true);
+  deleteBlockRequest.send();
+}
+
+function indentBlock(blockId) {
+  var indentBlockRequest;
+  indentBlockRequest = new XMLHttpRequest();
+  indentBlockRequest.onreadystatechange = function() {
+    if (indentBlockRequest.readyState === XMLHttpRequest.DONE) {
+          if (indentBlockRequest.status === 200) {
+            loadPage();
+          }
+        }
+    };
+  var apiRoute = "/api/indent/block/" + blockId;
+  indentBlockRequest.open('GET', apiRoute, true);
+  indentBlockRequest.send();
+}
+
+function createBlockInBlock(blockId, text) {
+  var newBlockRequest;
+  newBlockRequest = new XMLHttpRequest();
+  newBlockRequest.onreadystatechange = function() {
+    if (newBlockRequest.readyState === XMLHttpRequest.DONE) {
+          if (newBlockRequest.status === 200) {
+            loadPage();
+          }
+        }
+    };
+  var apiRoute = "/api/new/block/" + blockId + "/" + text;
+  newBlockRequest.open('GET', apiRoute, true);
+  newBlockRequest.send();
 }
 
 function createBlockInPage(pageId) {
-      var newBlockRequest;
-      newBlockRequest = new XMLHttpRequest();
-      newBlockRequest.onreadystatechange = function() {
-        if (newBlockRequest.readyState === XMLHttpRequest.DONE) {
-              if (newBlockRequest.status === 200) {
-                loadPage();
-              }
-            }
-        };
-      var apiRoute = "/api/new/block/page/" + pageId;
-      newBlockRequest.open('GET', apiRoute, true);
-      newBlockRequest.send();
+  var newBlockRequest;
+  newBlockRequest = new XMLHttpRequest();
+  newBlockRequest.onreadystatechange = function() {
+    if (newBlockRequest.readyState === XMLHttpRequest.DONE) {
+          if (newBlockRequest.status === 200) {
+            loadPage();
+          }
+        }
+    };
+  var apiRoute = "/api/new/block/page/" + pageId;
+  newBlockRequest.open('GET', apiRoute, true);
+  newBlockRequest.send();
 }
 
 loadPage();
