@@ -74,7 +74,9 @@ Vue.component('searchbox', {
       var selectedPageId;
       Array.from(event.target.list.children).forEach(c => {if (c.value == event.target.value) {selectedPageId = c.getAttribute("pageid") } })
       if (selectedPageId) { window.location.pathname = "/app/show/" + selectedPageId }
-      /*
+    },
+    createPage: function(event) {
+      event.preventDefault();
       var showOrCreatePageRequest;
       var component = this;
       showOrCreatePageRequest = new XMLHttpRequest();
@@ -85,12 +87,12 @@ Vue.component('searchbox', {
               }
             }
         };
-      var apiRoute = "/api/show_or_create?page-name=" + event.target.value;
+      var apiRoute = "/api/show_or_create?page-name=" + event.target.elements[0].value;
       showOrCreatePageRequest.open('GET', apiRoute, true);
-      showOrCreatePageRequest.send();*/
+      showOrCreatePageRequest.send();
     }
   },
-  template: '<div><input v-on:change="optionClick" placeholder="Find / Create Page" v-on:keyup="keyUp" list="searchResults"><datalist id="searchResults"><option v-for="result in results" v-bind:pageid="result.page_id" v-bind:value="[[result.title]]"><div>{{result.text}}</div></option></datalist></div>'
+  template: '<div><form v-on:submit="createPage" ><input v-on:change="optionClick" placeholder="Find / Create Page" v-on:keyup="keyUp" list="searchResults"><datalist id="searchResults"><option v-for="result in results" v-bind:pageid="result.page_id" v-bind:value="[[result.title]]"><div>{{result.text}}</div></option></datalist></form></div>'
 })
 
 Vue.component('block', {
