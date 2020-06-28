@@ -53,7 +53,7 @@ function findBlockByLevelAndPosition(blocks, level, position) {
 }
 
 Vue.component('searchbox', {
-  props: ['results'],
+  props: ['results', 'selectedId'],
   methods: {
     keyUp: function(event) {
       var searchRequest;
@@ -71,6 +71,10 @@ Vue.component('searchbox', {
       searchRequest.send();
     },
     optionClick: function(event) {
+      var selectedPageId;
+      Array.from(event.target.list.children).forEach(c => {if (c.value == event.target.value) {selectedPageId = c.getAttribute("pageid") } })
+      if (selectedPageId) { window.location.pathname = "/app/show/" + selectedPageId }
+      /*
       var showOrCreatePageRequest;
       var component = this;
       showOrCreatePageRequest = new XMLHttpRequest();
@@ -83,10 +87,10 @@ Vue.component('searchbox', {
         };
       var apiRoute = "/api/show_or_create?page-name=" + event.target.value;
       showOrCreatePageRequest.open('GET', apiRoute, true);
-      showOrCreatePageRequest.send();
+      showOrCreatePageRequest.send();*/
     }
   },
-  template: '<div><input v-on:change="optionClick" placeholder="edit me" v-on:keyup="keyUp" list="searchResults"><datalist id="searchResults"><option v-for="result in results" v-bind:pageid="result.page_id" v-bind:value="[[result.title]]"><div>{{result.text}}</div></option></datalist></div>'
+  template: '<div><input v-on:change="optionClick" placeholder="Find / Create Page" v-on:keyup="keyUp" list="searchResults"><datalist id="searchResults"><option v-for="result in results" v-bind:pageid="result.page_id" v-bind:value="[[result.title]]"><div>{{result.text}}</div></option></datalist></div>'
 })
 
 Vue.component('block', {
