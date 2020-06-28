@@ -3,6 +3,7 @@
 </head>
 
 <div id="app">
+  <searchbox v-bind:results="searchResults"></searchbox>
   {{ page.pageTitle }} ({{ page.id }})
   <br>
   <block
@@ -50,6 +51,43 @@ function findBlockByLevelAndPosition(blocks, level, position) {
   })
   return ret;
 }
+
+Vue.component('searchbox', {
+  props: ['results'],
+  methods: {
+    keyUp: function(event) {
+      var searchRequest;
+      var component = this;
+      searchRequest = new XMLHttpRequest();
+      searchRequest.onreadystatechange = function() {
+        if (searchRequest.readyState === XMLHttpRequest.DONE) {
+              if (searchRequest.status === 200) {
+                app.searchResults = JSON.parse(searchRequest.responseText)
+              }
+            }
+        };
+      var apiRoute = "/api/search/all?searchfragment=" + event.target.value;
+      searchRequest.open('GET', apiRoute, true);
+      searchRequest.send();
+    },
+    optionClick: function(event) {
+      var showOrCreatePageRequest;
+      var component = this;
+      showOrCreatePageRequest = new XMLHttpRequest();
+      showOrCreatePageRequest.onreadystatechange = function() {
+        if (showOrCreatePageRequest.readyState === XMLHttpRequest.DONE) {
+              if (showOrCreatePageRequest.status === 200) {
+                window.location.pathname = "/app/show/" + showOrCreatePageRequest.responseText;
+              }
+            }
+        };
+      var apiRoute = "/api/show_or_create?page-name=" + event.target.value;
+      showOrCreatePageRequest.open('GET', apiRoute, true);
+      showOrCreatePageRequest.send();
+    }
+  },
+  template: '<div><input v-on:change="optionClick" placeholder="edit me" v-on:keyup="keyUp" list="searchResults"><datalist id="searchResults"><option v-for="result in results" v-bind:pageid="result.page_id" v-bind:value="[[result.title]]"><div>{{result.text}}</div></option></datalist></div>'
+})
 
 Vue.component('block', {
   props: ['block', 'level', 'position'],
@@ -107,7 +145,7 @@ Vue.component('block', {
 //add a position to the above template and component itself
 var app = new Vue({
   el: '#app',
-  data: {page: pageData, currentRoute: window.location.pathname, linkedReferences: [], unlinkedReferences: []}
+  data: {page: pageData, currentRoute: window.location.pathname, linkedReferences: [], unlinkedReferences: [], searchResults: []}
 })
 
 function loadPage() {

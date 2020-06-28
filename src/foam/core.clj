@@ -88,6 +88,12 @@
 (db/defquery get-linked-references-query
   "MATCH (parent:page {id: $pid}) MATCH (p:page)-[:CONTAINS*]->(b:block) where b.text contains '[[' + parent.title + ']]' return p.id as page_id, p.title as title, b.id as block_id, b.text as text")
 
+(db/defquery search-page-titles-query
+  "MATCH (p:page) WHERE p.title contains $titlefragment return p.id as page_id, p.title as title")
+
+(db/defquery search-page-titles-and-blocks-query
+  "MATCH (p:page) WHERE p.title contains $searchfragment return p.id as page_id, p.title as title, null as block_id, null as text UNION ALL MATCH (parent:page)-[:CONTAINS*]->(b:block) where b.text contains $searchfragment return parent.id as page_id, parent.title as title, b.id as block_id, b.text as text")
+
 ;this should be executed inside another transaction
 (defn get-last-page-position [tx page-id] (:position (first (get-last-page-position-query tx {:pid page-id}))))
 
@@ -101,10 +107,14 @@
 
 (defn create-page 
   ([tx title]
-   (when (= (find-page-by-title-query tx {:title title}) ())
-     (def new-page-id (str (crypto.random/hex 10)))
-     (create-page-query tx {:title title :id new-page-id})
-     (seed-page-with-empty-block tx new-page-id)))
+   (def existing-id (find-page-by-title-query tx {:title title}))
+   (if (= existing-id ())
+      (do
+        (def new-page-id (str (crypto.random/hex 10)))
+        (create-page-query tx {:title title :id new-page-id})
+        (seed-page-with-empty-block tx new-page-id)
+        new-page-id)
+      (:id (:p (first existing-id)))))
   ([title] (db/with-transaction local-db tx (create-page tx title))))
 
 (defn update-relations-for-block [tx block-id text]
@@ -194,6 +204,14 @@
   (db/with-transaction local-db tx
     (json/write-str (get-linked-references-query tx {:pid page-id}))))
 
+(defn search-page-titles [title-fragment]
+  (db/with-transaction local-db tx
+    (json/write-str (search-page-titles-query tx {:titlefragment title-fragment}))))
+
+(defn search-page-titles-and-blocks [search-fragment]
+  (db/with-transaction local-db tx
+    (json/write-str (search-page-titles-and-blocks-query tx {:searchfragment search-fragment}))))
+
 (defn run-user-query [text user-query]
   (db/with-transaction local-db tx
     (db/defquery uq user-query)
@@ -229,6 +247,9 @@
   (def blocks (db/with-transaction local-db tx 
                 (seq (get-blocks-for-page-query tx {:pid page-id}))))
   (json/write-str {:pageTitle (:title (:p (first blocks))) :id (:id (:p (first blocks))) :children (reduce print-block-and-children [] blocks)}))
+
+(defn show-or-create-page [page-name]
+  (create-page page-name))
   
 (defn daily-notes []
   (def date (.format (java.text.SimpleDateFormat. "MMM d, yyyy") (new java.util.Date)))
@@ -250,8 +271,11 @@
   (GET "/api/unindent/block/:block-id" [block-id] (unindent-block block-id))
   (GET "/app/show/:page-id" [page-id] (slurp "./resources/index.html"))
   (GET "/api/show/:page-id" [page-id] (show-page page-id))
+  (GET "/api/show_or_create" [page-name] (show-or-create-page page-name))
   (GET "/api/references/unlinked/:page-id" [page-id] (get-unlinked-references page-id))
   (GET "/api/references/linked/:page-id" [page-id] (get-linked-references page-id))
+  (GET "/api/search/pagetitles/:title-fragment" [title-fragment] (search-page-titles title-fragment))
+  (GET "/api/search/all" [searchfragment] (search-page-titles-and-blocks searchfragment))
   (route/not-found "<h1>Page not found</h1>"))
 
 (def app
