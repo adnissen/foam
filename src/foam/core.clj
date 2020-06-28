@@ -94,6 +94,9 @@
 (db/defquery search-page-titles-and-blocks-query
   "MATCH (p:page) WHERE p.title contains $searchfragment return p.id as page_id, p.title as title, null as block_id, null as text UNION ALL MATCH (parent:page)-[:CONTAINS*]->(b:block) where b.text contains $searchfragment return parent.id as page_id, parent.title as title, b.id as block_id, b.text as text")
 
+(db/defquery rename-page-query
+  "MATCH (p:page {title: $ptitle}) MATCH (b:block) where b.text contains '[[' + $ptitle + ']]' set p.title = $newtitle, b.text = replace(b.text, '[[' + $ptitle + ']]', '[[' + $newtitle + ']]')")
+
 ;this should be executed inside another transaction
 (defn get-last-page-position [tx page-id] (:position (first (get-last-page-position-query tx {:pid page-id}))))
 
@@ -212,6 +215,10 @@
   (db/with-transaction local-db tx
     (json/write-str (search-page-titles-and-blocks-query tx {:searchfragment search-fragment}))))
 
+(defn rename-page [page-title new-title]
+  (db/with-transaction local-db tx
+    (rename-page-query tx {:ptitle page-title :newtitle new-title})))
+
 (defn run-user-query [text user-query]
   (db/with-transaction local-db tx
     (db/defquery uq user-query)
@@ -272,6 +279,7 @@
   (GET "/app/show/:page-id" [page-id] (slurp "./resources/index.html"))
   (GET "/api/show/:page-id" [page-id] (show-page page-id))
   (GET "/api/show_or_create" [page-name] (show-or-create-page page-name))
+  (GET "/api/rename_page" [page-title new-title] (rename-page page-title new-title))
   (GET "/api/references/unlinked/:page-id" [page-id] (get-unlinked-references page-id))
   (GET "/api/references/linked/:page-id" [page-id] (get-linked-references page-id))
   (GET "/api/search/pagetitles/:title-fragment" [title-fragment] (search-page-titles title-fragment))
