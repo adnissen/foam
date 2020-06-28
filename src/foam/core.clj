@@ -82,6 +82,12 @@
 (db/defquery get-number-of-fellow-root-blocks-in-page ;this will return 0 if the block passed in is not a root block
   "match (p:page)-[r:CONTAINS]->(b:block {id: $bid}) match (p)-[r2:CONTAINS]->() return COUNT(r2) as root_blocks_in_page")
 
+(db/defquery get-unlinked-references-query
+  "MATCH (parent:page {id: $pid}) MATCH (p:page)-[:CONTAINS*]->(b:block) where b.text contains parent.title and not b.text contains '[[' + parent.title + ']]' return p.id as page_id, p.title as title, b.id as block_id, b.text as text")
+
+(db/defquery get-linked-references-query
+  "MATCH (parent:page {id: $pid}) MATCH (p:page)-[:CONTAINS*]->(b:block) where b.text contains '[[' + parent.title + ']]' return p.id as page_id, p.title as title, b.id as block_id, b.text as text")
+
 ;this should be executed inside another transaction
 (defn get-last-page-position [tx page-id] (:position (first (get-last-page-position-query tx {:pid page-id}))))
 
@@ -180,6 +186,14 @@
   )
 )
 
+(defn get-unlinked-references [page-id]
+  (db/with-transaction local-db tx
+    (json/write-str (get-unlinked-references-query tx {:pid page-id}))))
+
+(defn get-linked-references [page-id]
+  (db/with-transaction local-db tx
+    (json/write-str (get-linked-references-query tx {:pid page-id}))))
+
 (defn run-user-query [text user-query]
   (db/with-transaction local-db tx
     (db/defquery uq user-query)
@@ -236,6 +250,8 @@
   (GET "/api/unindent/block/:block-id" [block-id] (unindent-block block-id))
   (GET "/app/show/:page-id" [page-id] (slurp "./resources/index.html"))
   (GET "/api/show/:page-id" [page-id] (show-page page-id))
+  (GET "/api/references/unlinked/:page-id" [page-id] (get-unlinked-references page-id))
+  (GET "/api/references/linked/:page-id" [page-id] (get-linked-references page-id))
   (route/not-found "<h1>Page not found</h1>"))
 
 (def app

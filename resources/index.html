@@ -12,6 +12,14 @@
     v-bind:position="index"
     v-bind:key="block.id">
   </block>
+
+  <small>Linked References</small>
+  <br />
+  {{ linkedReferences }}
+  <br />
+  <small>Unlinked References</small>
+  <br />
+  {{ unlinkedReferences }}
 </div>
 
 <script>
@@ -23,6 +31,8 @@ function alertContents() {
     if (httpRequest.readyState === XMLHttpRequest.DONE) {
       if (httpRequest.status === 200) {
         app.page = JSON.parse(httpRequest.responseText);
+        updateLinkedReferences();
+        updateUnlinkedReferences();
       } else {
         alert('There was a problem with the request.');
       }
@@ -65,7 +75,7 @@ Vue.component('block', {
         } else if ( e.shiftKey && e.keyCode == 9 ){    //shift-tab    
           e.preventDefault();
           unindentBlock(blockId);
-        } else if ( e.keyCode == 9 ){    //tab    
+        } else if ( e.keyCode == 9 ){    //tab
           e.preventDefault();
           indentBlock(blockId);
         } else if (e.keyCode == 8) { //backspace
@@ -97,16 +107,46 @@ Vue.component('block', {
 //add a position to the above template and component itself
 var app = new Vue({
   el: '#app',
-  data: {page: pageData, currentRoute: window.location.pathname}
+  data: {page: pageData, currentRoute: window.location.pathname, linkedReferences: [], unlinkedReferences: []}
 })
 
 function loadPage() {
-httpRequest = new XMLHttpRequest();
-httpRequest.onreadystatechange = alertContents;
-var apiRoute = "/api/daily-notes";
-if (app.currentRoute != "/") { apiRoute = app.currentRoute.replace("app", "api") }
-httpRequest.open('GET', apiRoute);
-httpRequest.send();
+  httpRequest = new XMLHttpRequest();
+  httpRequest.onreadystatechange = alertContents;
+  var apiRoute = "/api/daily-notes";
+  if (app.currentRoute != "/") { apiRoute = app.currentRoute.replace("app", "api") }
+  httpRequest.open('GET', apiRoute);
+  httpRequest.send();
+}
+
+function updateLinkedReferences() {
+  var updateLinkedReferencesRequest;
+  updateLinkedReferencesRequest = new XMLHttpRequest();
+  updateLinkedReferencesRequest.onreadystatechange = function() {
+    if (updateLinkedReferencesRequest.readyState === XMLHttpRequest.DONE) {
+          if (updateLinkedReferencesRequest.status === 200) {
+            app.linkedReferences = JSON.parse(updateLinkedReferencesRequest.responseText)
+          }
+        }
+    };
+  var apiRoute = "/api/references/linked/" + app.page.id;
+  updateLinkedReferencesRequest.open('GET', apiRoute, true);
+  updateLinkedReferencesRequest.send();
+}
+
+function updateUnlinkedReferences() {
+  var updateUnlinkedReferencesRequest;
+  updateUnlinkedReferencesRequest = new XMLHttpRequest();
+  updateUnlinkedReferencesRequest.onreadystatechange = function() {
+    if (updateUnlinkedReferencesRequest.readyState === XMLHttpRequest.DONE) {
+          if (updateUnlinkedReferencesRequest.status === 200) {
+            app.unlinkedReferences = JSON.parse(updateUnlinkedReferencesRequest.responseText)
+          }
+        }
+    };
+  var apiRoute = "/api/references/unlinked/" + app.page.id;
+  updateUnlinkedReferencesRequest.open('GET', apiRoute, true);
+  updateUnlinkedReferencesRequest.send();
 }
 
 function deleteBlock(blockId) {
